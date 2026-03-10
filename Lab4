@@ -1,0 +1,108 @@
+import pandas as pd
+import matplotlib.pyplot as plt
+import numpy as np
+import scipy.signal as sc
+
+#Load the signal data
+data = pd.read_csv("ecg_signal.csv")
+
+#Extract columns
+time = data["time"]
+signal = data["signal"]
+
+#Sampling frequency
+fs = 1/(time[1]-time[0])
+
+#Lowpass filter parameters
+cutoffl = 40
+order = 4
+b, a = sc.butter(order, cutoffl / (fs / 2), btype='low')
+
+lowpass_signal = sc.filtfilt(b, a, signal)
+
+#Highpass filter parameters
+cutoffh = 0.5
+
+a,b = sc.butter(order, cutoffh/(fs/2), btype = 'high')
+
+highpass_signal = sc.filtfilt(a, b, signal)
+
+#Bandpass filter parameters
+b,a = sc.butter(order, [cutoffh/(fs/2), cutoffl/(fs/2)], btype = "band")
+
+bandpass_signal = sc.filtfilt(b, a, signal)
+
+#Peak detection
+peaks, _ = sc.find_peaks(bandpass_signal, height=np.mean(bandpass_signal), distance=fs*0.6)
+
+#rr intervals
+rr_intervals = np.diff(time[peaks])
+
+#Heart rate
+heart_rate = 60 / rr_intervals
+avg_hr = np.mean(heart_rate)
+print("Average Heart Rate:", avg_hr, "BPM")
+
+#FFT of raw signal
+N = len(signal)
+fft_raw = np.fft.fft(signal)
+freqs = np.fft.fftfreq(N, 1/fs)
+
+#FFT of filtered signal
+fft_bandpass = np.fft.fft(bandpass_signal)
+
+#Plot the signal vs time
+plt.figure()
+plt.plot(time, signal)
+plt.xlabel("Time (s)")
+plt.ylabel("Amplitude")
+plt.title("Raw ECG Signal")
+plt.show()
+
+#Plot Raw ECG with Lowpass filtered ECG
+plt.figure()
+plt.plot(time, signal, label="Raw ECG", alpha=0.6)
+plt.plot(time, lowpass_signal, label="Low-pass Filtered ECG", linewidth=1)
+plt.xlabel("Time (s)")
+plt.ylabel("Amplitude")
+plt.title("Raw vs Low-pass Filtered ECG Signal")
+plt.legend()
+plt.show()
+
+#Plot the highpass filter signal
+plt.figure()
+plt.plot(time, highpass_signal)
+plt.xlabel("Time (s)")
+plt.ylabel("Amplitude")
+plt.title("Highpass Filtered ECG Signal")
+plt.show()
+
+#Plot raw vs bandpass filtered ECG
+plt.figure()
+plt.plot(time, signal, label="Raw ECG", alpha=0.6)
+plt.plot(time, bandpass_signal, label="Band-pass Filtered ECG", linewidth=1)
+plt.xlabel("Time (s)")
+plt.ylabel("Amplitude")
+plt.title("Raw vs Band-pass Filtered ECG Signal")
+plt.legend()
+plt.show()
+
+#Plot bandpass ecg with peak detection
+plt.figure()
+plt.plot(time, bandpass_signal, label="Filtered ECG")
+plt.plot(time[peaks], bandpass_signal[peaks], "ro", label="Detected Peaks")
+plt.xlabel("Time (s)")
+plt.ylabel("Amplitude")
+plt.title("ECG Signal with Detected R-Peaks")
+plt.legend()
+plt.show()
+
+#Plot spectra
+plt.figure()
+plt.plot(freqs, fft_raw, label="Raw Signal Spectrum", alpha=0.7)
+plt.plot(freqs, fft_bandpass, label="Filtered Signal Spectrum", linewidth=1)
+plt.xlabel("Frequency (Hz)")
+plt.ylabel("Magnitude")
+plt.title("FFT Spectrum of Raw vs Filtered ECG Signal")
+plt.legend()
+plt.show()
